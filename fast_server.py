@@ -116,5 +116,43 @@ async def upload_file(file: UploadFile = File(...)):
         logging.error(f"Error processing file: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+
+@app.post("/predictWriting")
+async def predict(file: UploadFile = File(...)):
+    # Read the image file as bytes
+    image_bytes = await file.read()
+    
+    # Convert bytes to a NumPy array
+    image_array = np.frombuffer(image_bytes, np.uint8)
+    
+    # Decode the image array into an image
+    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    
+    if image is None:
+        return {"error": "Failed to process the image"}
+
+    # Preprocess the image like in your preprocessing function
+    processed_image = preprocess_image(image)
+
+    # Perform prediction
+    probabilities = model.predict_proba(processed_image)
+    prediction = model.predict(processed_image)
+    print(prediction)
+    print(probabilities)
+
+    return {
+        'predicted_class': prediction[0],
+        'confidence_class_0': probabilities[0][0] * 100,
+        'confidence_class_1': probabilities[0][1] * 100
+    }
+
+
+
+
+
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5001)
