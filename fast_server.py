@@ -116,5 +116,3 @@ async def upload_file(file: UploadFile = File(...)):
         logging.error(f"Error processing file: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5001)
