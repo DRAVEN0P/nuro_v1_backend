@@ -1,20 +1,16 @@
-import uvicorn
+from flask import Flask, request, jsonify
 import numpy as np
 import cv2
 from io import BytesIO
 from PIL import Image
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-import parselmouth
-from parselmouth.praat import call
+import joblib
 import os
 import logging
-import uvicorn
 import traceback
-import joblib
+import parselmouth
+from parselmouth.praat import call
 
-app = FastAPI()
+app = Flask(__name__)
 
 # Load your model and scaler
 model = joblib.load('./logistic_model.joblib')
@@ -33,38 +29,47 @@ def preprocess_image(image, target_size=(64, 64)):
     image = scaler.transform(image)
     return image
 
-@app.post("/predict")
-async def predict(file: UploadFile = File(...)):
-    # Read the image file as bytes
-    image_bytes = await file.read()
+@app.route('/predict', methods=['POST'])
+def predict():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in the request"}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+
+    try:
+        # Read the image file as bytes
+        image_bytes = file.read()
+        
+        # Convert bytes to a NumPy array
+        image_array = np.frombuffer(image_bytes, np.uint8)
+        
+        # Decode the image array into an image
+        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+        
+        if image is None:
+            return jsonify({"error": "Failed to process the image"}), 400
+
+        # Preprocess the image like in your preprocessing function
+        processed_image = preprocess_image(image)
+
+        # Perform prediction
+        probabilities = model.predict_proba(processed_image)
+        prediction = model.predict(processed_image)
+
+        return jsonify({
+            'predicted_class': prediction[0],
+            'confidence_class_0': probabilities[0][0] * 100,
+            'confidence_class_1': probabilities[0][1] * 100
+        })
     
-    # Convert bytes to a NumPy array
-    image_array = np.frombuffer(image_bytes, np.uint8)
-    
-    # Decode the image array into an image
-    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-    
-    if image is None:
-        return {"error": "Failed to process the image"}
+    except Exception as e:
+        logging.error(f"Error during prediction: {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
 
-    # Preprocess the image like in your preprocessing function
-    processed_image = preprocess_image(image)
-
-    # Perform prediction
-    probabilities = model.predict_proba(processed_image)
-    prediction = model.predict(processed_image)
-    print(prediction)
-    print(probabilities)
-
-    return {
-        'predicted_class': prediction[0],
-        'confidence_class_0': probabilities[0][0] * 100,
-        'confidence_class_1': probabilities[0][1] * 100
-    }
-
-logging.basicConfig(level=logging.DEBUG)
-
-UPLOAD_FOLDER = r'ServerFlask/uploads'
+UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def measure_pitch(voiceID, f0min, f0max, unit):
@@ -89,20 +94,25 @@ def measure_pitch(voiceID, f0min, f0max, unit):
     
     return duration, meanF0, hnr, local_jitter, local_shimmer
 
-@app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in the request"}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+
     try:
         # Save the file
-        filename = file.filename
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
-        with open(file_path, 'wb') as f:
-            content = await file.read()
-            f.write(content)
+        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        file.save(file_path)
         
         # Process the file
         try:
             duration, meanF0, hnr, local_jitter, local_shimmer = measure_pitch(file_path, 75, 500, 'Hertz')
-            return JSONResponse(content={
+            return jsonify({
                 'duration': duration,
                 'meanF0': meanF0,
                 'hnr': hnr,
@@ -111,10 +121,11 @@ async def upload_file(file: UploadFile = File(...)):
             })
         except Exception as e:
             logging.error(f"Error extracting metrics: {traceback.format_exc()}")
-            raise HTTPException(status_code=500, detail=str(e))
+            return jsonify({"error": str(e)}), 500
+    
     except Exception as e:
         logging.error(f"Error processing file: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return jsonify({"error": str(e)}), 500
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5001)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5001)
