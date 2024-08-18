@@ -17,8 +17,8 @@ import joblib
 app = FastAPI()
 
 # Load your model and scaler
-model = joblib.load('logistic_model.joblib')
-scaler = joblib.load('scaler.joblib')  # Ensure you have saved the scaler
+model = joblib.load('./logistic_model.joblib')
+scaler = joblib.load('./scaler.joblib')  # Ensure you have saved the scaler
 
 def preprocess_image(image, target_size=(64, 64)):
     # Resize the image
@@ -64,7 +64,7 @@ async def predict(file: UploadFile = File(...)):
 
 logging.basicConfig(level=logging.DEBUG)
 
-UPLOAD_FOLDER = r'C:\Users\diyam\Documents\AudioP\ServerFlask\uploads'
+UPLOAD_FOLDER = r'ServerFlask/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def measure_pitch(voiceID, f0min, f0max, unit):
