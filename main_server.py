@@ -131,6 +131,27 @@ def upload_file():
 
 
 # -------------------------Writing --------------------------------------
+UPLOAD_FOLDER_WR = 'uploads/writing'
+os.makedirs(UPLOAD_FOLDER_WR, exist_ok=True)
+
+
+def predict_image_writing(model, scaler, image_path, target_size=(64, 64)):
+    image = cv2.imread(image_path)
+    if image is not None:
+        image = cv2.resize(image, target_size)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # Convert to grayscale
+        image = image / 255.0  # Normalize
+        image = image.flatten().reshape(1, -1)
+        image = scaler.transform(image)
+        probabilities = model.predict_proba(image)
+        prediction = model.predict(image)
+        return {
+            'predicted_class': prediction[0],
+            'confidence_class_0': probabilities[0][0] * 100,
+            'confidence_class_1': probabilities[0][1] * 100
+        }
+
+
 @app.route('/predictWriting', methods=['POST'])
 def predicWriting():
     if 'file' not in request.files:
@@ -142,30 +163,14 @@ def predicWriting():
         return jsonify({"error": "No file selected"}), 400
 
     try:
-        # Read the image file as bytes
-        image_bytes = file.read()
-
-        # Convert bytes to a NumPy array
-        image_array = np.frombuffer(image_bytes, np.uint8)
-
-        # Decode the image array into an image
-        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-
-        if image is None:
-            return jsonify({"error": "Failed to process the image"}), 400
-
+        file_path = os.path.join(UPLOAD_FOLDER_WR, file.filename)
+        file.save(file_path)
         # Preprocess the image like in your preprocessing function
-        processed_image = preprocess_image_face(image)
+        wr_res = predict_image_writing(model=modelWriting,scaler=scaler,image_path=file_path)
 
-        # Perform prediction
-        probabilities = modelWriting.predict_proba(processed_image)
-        prediction = modelWriting.predict(processed_image)
-
-        return jsonify({
-            'predicted_class': prediction[0],
-            'confidence_class_0': probabilities[0][0] * 100,
-            'confidence_class_1': probabilities[0][1] * 100
-        })
+        return jsonify(
+            wr_res
+        )
 
     except Exception as e:
         logging.error(f"Error during prediction: {traceback.format_exc()}")

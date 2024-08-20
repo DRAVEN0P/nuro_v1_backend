@@ -38,13 +38,6 @@ def predict_image(model, scaler, image_path, target_size=(64, 64)):
             image = scaler.transform(image)
             probabilities = model.predict_proba(image)
             prediction = model.predict(image)
-            # image = Image.open(image_path)
-            # plt.imshow(image)
-            # plt.axis('off')
-            # plt.show()
-            print(f'Predicted Class: {prediction[0]}')
-            print(f'Confidence for class 0: {probabilities[0][0] * 100:.2f}%')
-            print(f'Confidence for class 1: {probabilities[0][1] * 100:.2f}%')
             return {
                 'predicted_class': prediction[0],
                 'confidence_class_0': probabilities[0][0] * 100,
