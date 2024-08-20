@@ -53,7 +53,7 @@ def predict_image(model, scaler, image_path, target_size=(64, 64)):
         else:
             # Here you need to code for retaking the image
             return {
-                "confidence_class_0": 0,
-                "confidence_class_1": 0,
+                "confidence_class_0": 0.00,
+                "confidence_class_1": 0.00,
                 "predicted_class": "None"
             }  # exclude this line
