@@ -1,3 +1,9 @@
 Flask
 flask-cors
 gunicorn
+Flask
+numpy
+opencv-python
+Pillow
+joblib
+parselmouth
