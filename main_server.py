@@ -60,7 +60,7 @@ def predictImg():
 
     try:
 
-        file_path = os.path.join(UPLOAD_FOLDER_AUD, file.filename)
+        file_path = os.path.join(UPLOAD_FOLDER_IMG, file.filename)
         file.save(file_path)
         res = predict_image(model=model, scaler=scaler, image_path=file_path)
         return jsonify(res)
