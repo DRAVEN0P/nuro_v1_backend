@@ -18,7 +18,7 @@ app = Flask(__name__)
 model = joblib.load('./logistic_model.joblib')
 scaler = joblib.load('./scaler.joblib')
 # Ensure you have saved the scaler
-modelWriting = joblib.load('./writingModel.joblib')
+modelWriting = joblib.load('./wr_model.pkl')
 face_cascade = cv2.CascadeClassifier(
     cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
