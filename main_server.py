@@ -28,19 +28,13 @@ def preprocess_image_face(image, target_size=(64, 64)):
     image = cv2.resize(image, target_size)
     # Convert to grayscale
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # Normalize the image
+    image = image / 255.0
+    # Flatten the image
+    image = image.flatten().reshape(1, -1)
+    # Scale the image
+    image = scaler.transform(image)
 
-    faces = face_cascade.detectMultiScale(
-        image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-
-    if len(faces) > 0:
-        # Normalize the image
-        image = image / 255.0
-        # Flatten the image
-        image = image.flatten().reshape(1, -1)
-        # Scale the image
-        image = scaler.transform(image)
-    else:
-        return None
     return image
 
 
@@ -64,7 +58,6 @@ def predictImg():
         file.save(file_path)
         res = predict_image(model=model, scaler=scaler, image_path=file_path)
         return jsonify(res)
-        
 
     except Exception as e:
         logging.error(f"Error during prediction: {traceback.format_exc()}")
