@@ -9,6 +9,8 @@ import logging
 import traceback
 import parselmouth
 from parselmouth.praat import call
+from img import predict_image
+
 
 app = Flask(__name__)
 
@@ -17,24 +19,37 @@ model = joblib.load('./logistic_model.joblib')
 scaler = joblib.load('./scaler.joblib')
 # Ensure you have saved the scaler
 modelWriting = joblib.load('./writingModel.joblib')
+face_cascade = cv2.CascadeClassifier(
+    cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
 
-def preprocess_image(image, target_size=(64, 64)):
+def preprocess_image_face(image, target_size=(64, 64)):
     # Resize the image
     image = cv2.resize(image, target_size)
     # Convert to grayscale
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    # Normalize the image
-    image = image / 255.0
-    # Flatten the image
-    image = image.flatten().reshape(1, -1)
-    # Scale the image
-    image = scaler.transform(image)
+
+    faces = face_cascade.detectMultiScale(
+        image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+    if len(faces) > 0:
+        # Normalize the image
+        image = image / 255.0
+        # Flatten the image
+        image = image.flatten().reshape(1, -1)
+        # Scale the image
+        image = scaler.transform(image)
+    else:
+        return None
     return image
 
 
+UPLOAD_FOLDER_IMG = 'uploads/img'
+os.makedirs(UPLOAD_FOLDER_IMG, exist_ok=True)
+
+
 @app.route('/predict', methods=['POST'])
-def predict():
+def predictImg():
     if 'file' not in request.files:
         return jsonify({"error": "No file part in the request"}), 400
 
@@ -44,38 +59,21 @@ def predict():
         return jsonify({"error": "No file selected"}), 400
 
     try:
-        # Read the image file as bytes
-        image_bytes = file.read()
 
-        # Convert bytes to a NumPy array
-        image_array = np.frombuffer(image_bytes, np.uint8)
-
-        # Decode the image array into an image
-        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-
-        if image is None:
-            return jsonify({"error": "Failed to process the image"}), 400
-
-        # Preprocess the image like in your preprocessing function
-        processed_image = preprocess_image(image)
-
-        # Perform prediction
-        probabilities = model.predict_proba(processed_image)
-        prediction = model.predict(processed_image)
-
-        return jsonify({
-            'predicted_class': prediction[0],
-            'confidence_class_0': probabilities[0][0] * 100,
-            'confidence_class_1': probabilities[0][1] * 100
-        })
+        file_path = os.path.join(UPLOAD_FOLDER_AUD, file.filename)
+        file.save(file_path)
+        res = predict_image(model=model, scaler=scaler, image_path=file_path)
+        return jsonify(res)
+        
 
     except Exception as e:
         logging.error(f"Error during prediction: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
 
-UPLOAD_FOLDER = 'uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# ----------------------------- Voice ----------------------------------
+UPLOAD_FOLDER_AUD = 'uploads/audio'
+os.makedirs(UPLOAD_FOLDER_AUD, exist_ok=True)
 
 
 def measure_pitch(voiceID, f0min, f0max, unit):
@@ -115,7 +113,7 @@ def upload_file():
 
     try:
         # Save the file
-        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        file_path = os.path.join(UPLOAD_FOLDER_AUD, file.filename)
         file.save(file_path)
 
         # Process the file
@@ -139,6 +137,7 @@ def upload_file():
         return jsonify({"error": str(e)}), 500
 
 
+# -------------------------Writing --------------------------------------
 @app.route('/predictWriting', methods=['POST'])
 def predicWriting():
     if 'file' not in request.files:
@@ -163,7 +162,7 @@ def predicWriting():
             return jsonify({"error": "Failed to process the image"}), 400
 
         # Preprocess the image like in your preprocessing function
-        processed_image = preprocess_image(image)
+        processed_image = preprocess_image_face(image)
 
         # Perform prediction
         probabilities = modelWriting.predict_proba(processed_image)
