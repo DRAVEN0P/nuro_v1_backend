@@ -10,7 +10,7 @@ import traceback
 import parselmouth
 from parselmouth.praat import call
 from img import predict_image
-
+from Feature_Extraction import Feature
 
 app = Flask(__name__)
 
@@ -100,6 +100,8 @@ def upload_file():
         return jsonify({"error": "No file part in the request"}), 400
 
     file = request.files['file']
+    gender = request.form.get('gender').upper()
+    age = int(request.form.get('age')) 
 
     if file.filename == '':
         return jsonify({"error": "No file selected"}), 400
@@ -111,14 +113,21 @@ def upload_file():
 
         # Process the file
         try:
-            duration, meanF0, hnr, local_jitter, local_shimmer = measure_pitch(
-                file_path, 75, 500, 'Hertz')
+            duration, meanF0, hnr, localJitter, localShimmer, mean_energy, mean_soe, mean_zcr,f1_mean, f2_mean, f3_mean, f4_mean, f5_mean = Feature(file_path,75, 300, "Hertz",gender,age)
+            
             return jsonify({
                 'duration': duration,
-                'meanF0': meanF0,
+                'gender': gender,
+                'age': age,
                 'hnr': hnr,
-                'localJitter': local_jitter,
-                'localShimmer': local_shimmer
+                'meanF0': meanF0,
+                'f1_mean': f1_mean,
+                'f2_mean': f2_mean,
+                'f3_mean': f3_mean,
+                'f4_mean': f4_mean,
+                'f5_mean': f5_mean,
+                'localJitter': localJitter,
+                'localShimmer': localShimmer,
             })
         except Exception as e:
             logging.error(f"Error extracting metrics: {
